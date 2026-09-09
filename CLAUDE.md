@@ -18,18 +18,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 `code-review-pr` 의 사본이 `~/dev/devgrr/eland/brand/.claude/skills/` 에 있고
 아직 커밋되지 않았다. 여기를 고치면 그쪽도 같이 봐야 한다.
 
-## 세 스킬은 리뷰 사다리다
+## 네 스킬은 리뷰 사다리다
 
-같은 일을 셋으로 나눈 게 아니라, **변경이 어느 단계에 있느냐**로 나뉜다. 각각
-다른 상류 리뷰어를 감싼다.
+같은 일을 넷으로 나눈 게 아니라, **변경이 어느 단계에 있느냐**로 나뉜다.
 
-| 스킬 | 대상 | 감싸는 것 |
+| 스킬 | 대상 | 리뷰 주체 |
 |---|---|---|
 | `code-review-before-commit` | 커밋 전 워킹 트리 (staged + unstaged + untracked) | `pr-review-toolkit:review-pr` |
 | `code-review-add-feature` | 커밋된 기능 범위 `BASE..HEAD` | `superpowers:requesting-code-review` |
 | `code-review-pr` | 올라온 PR 번호 | 빌트인 `code-review` |
+| `code-review-final` | 머지 직전 PR (브랜치를 체크아웃한다) | 감싸지 않는다. Opus 서브에이전트 3개를 직접 띄운다 |
 
-## 세 스킬이 공유하는 설계 — 새 스킬도 이걸 따른다
+앞의 셋은 여기서 만든 **래퍼**고, `code-review-final` 은 외부 저장소에서 그대로
+가져온 것이다. 규약이 다르니 섞어 읽지 마라 (아래 예외 절).
+
+`code-review-pr` 과 `code-review-final` 은 둘 다 PR 이 대상이고 `description` 의 호출
+문구가 겹친다. 한 저장소에 같이 설치하면 어느 쪽이 뜰지 예측이 안 된다.
+
+## 래퍼 셋이 공유하는 설계 — 새 래퍼도 이걸 따른다
 
 리뷰 자체를 새로 만들지 않는다. 상류 도구를 부르고, **그 도구가 놓치는 두 가지만
 보탠다.** 그게 래퍼의 존재 이유다.
@@ -54,6 +60,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 위치는 `파일:줄`. "인증 로직 부근" 은 위치가 아니다.
 - 사용자 인덱스를 건드리지 않는다. `git add -N` / `git add` / `git stash` 로 범위를
   맞추려 하지 말고 물어본다.
+
+### code-review-final 은 이 규약을 따르지 않는다
+
+`nalpari/interplug-team-agent-skills` 의 `ip-code-review-claude` 를 가져온 것이다
+(`name` 필드만 바꿨다). 전제가 달라서 위 규약에 맞추려 들면 스킬이 망가진다.
+
+| 위 규약 | code-review-final |
+|---|---|
+| 상류 도구를 감싼다 | 감싸지 않는다. Opus 서브에이전트 3개를 한 메세지에 동시에 띄운다 |
+| 프로젝트 규칙 축을 얹는다 | 없다. 대상 저장소 `CLAUDE.md` 를 읽지 않는다 |
+| 보고만 한다 | 브랜치를 체크아웃하고, PR 코멘트 등록이 산출물이다 |
+| 심각도 표 하나 | 머지 블로커만 남기고 major/minor 는 버린다 |
+
+원본이 갱신돼도 여기로 자동으로 따라오지 않는다. 다시 가져와야 한다.
 
 ## SKILL.md 형식
 

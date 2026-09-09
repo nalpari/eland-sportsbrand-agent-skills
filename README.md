@@ -1,6 +1,6 @@
 # eland-sportsbrand-agent-skills
 
-변경이 어느 단계에 있느냐에 따라 갈라지는 **Claude Code 코드리뷰 스킬 3종**.
+변경이 어느 단계에 있느냐에 따라 갈라지는 **Claude Code 코드리뷰 스킬 4종**.
 마크다운뿐이고 빌드할 것이 없다.
 
 ## 무엇인가
@@ -14,7 +14,9 @@ Claude Code 에는 이미 여러 리뷰 도구가 있다. 문제는 두 가지�
    같은 변경에서 갱신했는지 — 빌드도 린트도 테스트도 안 잡는다. 리뷰가 놓치면
    아무도 안 잡는다.
 
-이 스킬들은 리뷰를 새로 만들지 않는다. 기존 도구를 부르고 저 두 가지만 보탠다.
+앞의 세 스킬은 리뷰를 새로 만들지 않는다. 기존 도구를 부르고 저 두 가지만 보탠다.
+네 번째 `code-review-final` 만 다르다 — 머지 직전 관문이라 자체 서브에이전트로
+적대적 리뷰를 돌리고 결과를 PR 코멘트로 남긴다.
 
 ## 설치
 
@@ -36,6 +38,11 @@ cp -R code-review-before-commit ~/.claude/skills/
 | 아직 커밋 안 함 | `code-review-before-commit` | "커밋 전에 리뷰해줘" |
 | 기능 하나 완성, 커밋됨 | `code-review-add-feature` | "기능 구현 완료했어 리뷰해줘" |
 | PR 올라감 | `code-review-pr` | "#123 리뷰해줘" |
+| 머지 직전 | `code-review-final` | "머지해도 되는지 봐줘" |
+
+> `code-review-pr` 과 `code-review-final` 은 둘 다 PR 이 대상이고 호출 문구가 겹친다
+> ("PR 리뷰해줘"). 한 저장소에 같이 설치하면 어느 쪽이 뜰지 예측이 안 되니, 둘 중
+> 하나만 설치하거나 `description` 의 호출 문구를 갈라 놓아라.
 
 ### code-review-before-commit
 
@@ -56,6 +63,16 @@ cp -R code-review-before-commit ~/.claude/skills/
 표로 낸다. 팀원 전원이 같은 기준으로 PR 을 보게 하는 것이 목적이다.
 `ultra` 는 부르지 않고, `--comment`/`--fix` 는 요청받았을 때만 붙인다.
 
+### code-review-final
+
+PR 번호와 브랜치를 받아 **체크아웃한 뒤**, Opus 서브에이전트 3개를 정확성 /
+보안·데이터 무결성 / 통합·회귀 관점으로 동시에 띄워 적대적으로 공격한다. 리드는
+직접 리뷰하지 않고 그 결과에서 **머지 블로커만** 걸러 해결 방안을 붙이고, 표를
+사용자에게 보여준 뒤 PR 코멘트로 등록한다. major·minor·취향 지적은 버린다.
+
+`nalpari/interplug-team-agent-skills` 의 `ip-code-review-claude` 를 가져온 것이다.
+원본이 갱신돼도 자동으로 따라오지 않는다.
+
 ## 전제
 
 | 스킬 | 필요한 것 |
@@ -63,9 +80,14 @@ cp -R code-review-before-commit ~/.claude/skills/
 | `code-review-before-commit` | `pr-review-toolkit` 플러그인 |
 | `code-review-add-feature` | `superpowers` 플러그인 |
 | `code-review-pr` | 빌트인 `code-review`, `gh` CLI |
+| `code-review-final` | `gh` CLI, Opus 서브에이전트를 띄울 수 있는 세션 |
 
-셋 다 리뷰 결과를 **보고만 한다.** 파일 수정·커밋·PR 코멘트 등록은 명시적으로
+앞의 셋은 리뷰 결과를 **보고만 한다.** 파일 수정·커밋·PR 코멘트 등록은 명시적으로
 요청했을 때만 한다.
+
+`code-review-final` 은 예외다. **브랜치를 체크아웃하고** (워킹 트리가 더러우면 멈추고
+알린다) **PR 코멘트를 등록한다.** 코멘트는 팀 전체에 보인다. 리뷰만 보고 싶으면
+`code-review-pr` 을 써라.
 
 ## 다른 저장소에 옮길 때
 
@@ -76,6 +98,9 @@ cp -R code-review-before-commit ~/.claude/skills/
 
 대상 저장소에 `CLAUDE.md` 가 없으면 규칙 축은 그냥 건너뛰고, 남는 것은 범위 교정과
 표 정리다. 그것만으로도 쓸모는 있지만 이 스킬들의 절반이다.
+
+`code-review-final` 은 규칙 축이 없어서 이 작업이 필요 없다. 어느 저장소에 놓든
+그대로 동작한다.
 
 ## 기여
 
