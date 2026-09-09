@@ -6,7 +6,6 @@ description: 'codex 구독 없이 Claude 만으로 PR 을 적대적 리뷰한다
 # Adversarial PR Review (Claude only) → 머지 블로커 코멘트
 
 서브 에이전트가 적대적으로 리뷰하고, 리드가 **머지 블로커만** 걸러 표로 정리해 PR 에 코멘트로 남긴다.
-`ip-code-review` 와 결과물은 같고, codex 구독이 필요 없다.
 
 | 역할 | 주체 | 하는 일 |
 |------|------|---------|
