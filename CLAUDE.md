@@ -75,6 +75,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 원본이 갱신돼도 여기로 자동으로 따라오지 않는다. 다시 가져와야 한다.
 
+## grilling 은 리뷰 스킬이 아니고, 아래 형식도 따르지 않는다
+
+`mattpocock/skills` 의 `skills/productivity/grilling/SKILL.md` 를 커밋 `170ad48`
+(2026-07-13) 시점 그대로 가져왔다. 한 글자도 바꾸지 않았다.
+
+- 본문이 영어고 `## 하지 말 것` 절이 없다. **한국어로 옮기거나 절을 보태지 마라.**
+  원본과 `diff` 로 대조할 수 있어야 버전을 확인하고 다시 가져올 수 있다.
+- 원본 최신판(라운드 방식, 한 라운드에 질문 여러 개)으로 올리지 마라. 한 번에 하나씩
+  묻는 이 버전을 일부러 고정한 것이다.
+- 확인은 원본 저장소에서
+  `git show 170ad48:skills/productivity/grilling/SKILL.md | diff - grilling/SKILL.md`.
+
 ## SKILL.md 형식
 
 - frontmatter 는 `name`, `description` 둘뿐이다.
