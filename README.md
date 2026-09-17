@@ -41,9 +41,11 @@ cp -R code-review-before-commit ~/.claude/skills/
 | PR 올라감 | `code-review-pr` | "#123 리뷰해줘" |
 | 머지 직전 | `code-review-final` | "머지해도 되는지 봐줘" |
 
-> `code-review-pr` 과 `code-review-final` 은 둘 다 PR 이 대상이고 호출 문구가 겹친다
-> ("PR 리뷰해줘"). 한 저장소에 같이 설치하면 어느 쪽이 뜰지 예측이 안 되니, 둘 중
-> 하나만 설치하거나 `description` 의 호출 문구를 갈라 놓아라.
+> `code-review-pr` 과 `code-review-final` 은 둘 다 PR 이 대상이니 호출 문구를 갈라
+> 놓았다 — "PR 리뷰해줘"/"#123 리뷰" 는 `code-review-pr`, "머지해도 되는지 봐줘"/
+> 적대적 리뷰/코멘트 등록은 `code-review-final`. `code-review-final` 에는
+> `disable-model-invocation: true` 가 있어 모델이 자동으로 띄우지 않고,
+> `/code-review-final` 로 직접 건다. 새 PR 리뷰 스킬을 더할 때도 이 경계를 지킨다.
 
 ### code-review-before-commit
 
@@ -72,7 +74,9 @@ PR 번호와 브랜치를 받아 **체크아웃한 뒤**, Opus 서브에이전�
 사용자에게 보여준 뒤 PR 코멘트로 등록한다. major·minor·취향 지적은 버린다.
 
 `nalpari/interplug-team-agent-skills` 의 `ip-code-review-claude` 를 가져온 것이다.
-원본이 갱신돼도 자동으로 따라오지 않는다.
+원본이 갱신돼도 자동으로 따라오지 않는다. 원본과 다르게 `description` 의 호출 문구를
+`code-review-pr` 과 갈라 놓았고, `disable-model-invocation: true` 를 얹어 사용자가
+`/code-review-final` 로 직접 건다 — 다시 가져오면 이 두 가지가 돌아간다.
 
 ## grilling
 

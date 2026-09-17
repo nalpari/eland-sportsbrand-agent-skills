@@ -32,8 +32,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 앞의 셋은 여기서 만든 **래퍼**고, `code-review-final` 은 외부 저장소에서 그대로
 가져온 것이다. 규약이 다르니 섞어 읽지 마라 (아래 예외 절).
 
-`code-review-pr` 과 `code-review-final` 은 둘 다 PR 이 대상이고 `description` 의 호출
-문구가 겹친다. 한 저장소에 같이 설치하면 어느 쪽이 뜰지 예측이 안 된다.
+`code-review-pr` 과 `code-review-final` 은 둘 다 PR 이 대상이니 description 의 호출
+문구를 겹치게 쓰지 않는다 — "PR 리뷰해줘"/"#123 리뷰" 는 `code-review-pr`,
+"머지해도 되는지 봐줘"/적대적 리뷰/코멘트 등록은 `code-review-final` 이 가져간다.
+`code-review-final` 은 `disable-model-invocation: true` 여서 모델 자동 트리거 대상이
+아니고, 겹치는 문구가 생기면 충돌이 아니라 죽은 트리거가 된다. 새 PR 리뷰 스킬을
+더할 때도 이 경계를 따른다.
 
 ## 래퍼 셋이 공유하는 설계 — 새 래퍼도 이걸 따른다
 
@@ -72,6 +76,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | 프로젝트 규칙 축을 얹는다 | 없다. 대상 저장소 `CLAUDE.md` 를 읽지 않는다 |
 | 보고만 한다 | 브랜치를 체크아웃하고, PR 코멘트 등록이 산출물이다 |
 | 심각도 표 하나 | 머지 블로커만 남기고 major/minor 는 버린다 |
+| 모델이 description 으로 고른다 | `disable-model-invocation: true` — 사용자가 `/code-review-final` 로만 건다 |
+
+마지막 두 줄은 여기서 수동으로 얹은 개입이다. 원본 `ip-code-review-claude` 의
+description 은 "PR 리뷰해줘" 를 `code-review-pr` 과 겹치게 쓰고, frontmatter 에 이
+필드가 없다. **원본을 다시 가져오면 두 가지가 모두 돌아온다** — description 충돌이
+재발하니 재-가져온 뒤 이 절대로 다시 갈라놓아라.
 
 원본이 갱신돼도 여기로 자동으로 따라오지 않는다. 다시 가져와야 한다.
 
@@ -89,11 +99,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## SKILL.md 형식
 
-- frontmatter 는 `name`, `description` 둘뿐이다.
+- frontmatter 는 `name`, `description` 둘뿐이다. 유일한 예외는 `code-review-final` 의
+  `disable-model-invocation: true` — 아래 "code-review-final 은 이 규약을 따르지 않는다" 절 참조.
 - `description` 이 유일한 트리거 수단이다. 무엇을 하는지 + 실제 호출 문구
   ("PR 리뷰해줘", "커밋 전에 리뷰") + 언제 쓰면 안 되는지를 넣는다. 스킬은
   과소 트리거되는 쪽으로 치우치므로 다소 밀어붙이는 문장이 맞다.
 - 본문은 한국어 명령형. 규칙마다 **왜** 그런지를 붙인다 — 이유 없는 규칙은 지켜지지 않는다.
+- `disable-model-invocation: true` 는 "사용자가 슬래시로 치는 관문" 류에만 붙인다.
+  모델 자동 트리거를 원천 차단하므로, 모델이 먼저 뜨는 게 맞는 스킬에 붙이면 죽은 스킬이 된다.
 - 마지막은 `## 하지 말 것`. 조용히 틀리는 실패 모드를 적는 자리다.
 
 ## 커밋
