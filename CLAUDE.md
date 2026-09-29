@@ -18,26 +18,30 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 `code-review-pr` 의 사본이 `~/dev/devgrr/eland/brand/.claude/skills/` 에 있고
 아직 커밋되지 않았다. 여기를 고치면 그쪽도 같이 봐야 한다.
 
-## 네 스킬은 리뷰 사다리다
+## 다섯 스킬은 리뷰 사다리다
 
-같은 일을 넷으로 나눈 게 아니라, **변경이 어느 단계에 있느냐**로 나뉜다.
+같은 일을 다섯으로 나눈 게 아니라, **변경이 어느 단계에 있느냐**로 나뉜다.
 
 | 스킬 | 대상 | 리뷰 주체 |
 |---|---|---|
 | `code-review-before-commit` | 커밋 전 워킹 트리 (staged + unstaged + untracked) | `pr-review-toolkit:review-pr` |
 | `code-review-add-feature` | 커밋된 기능 범위 `BASE..HEAD` | `superpowers:requesting-code-review` |
 | `code-review-pr` | 올라온 PR 번호 | 빌트인 `code-review` |
+| `code-review-triad` | 올라온 PR 번호 (임시 worktree 에 푼다) | 감싸지 않는다. Sonnet 3개가 리뷰, Opus 1개가 판정 |
 | `code-review-final` | 머지 직전 PR (브랜치를 체크아웃한다) | 감싸지 않는다. Opus 서브에이전트 3개를 직접 띄운다 |
 
 앞의 셋은 여기서 만든 **래퍼**고, `code-review-final` 은 외부 저장소에서 그대로
-가져온 것이다. 규약이 다르니 섞어 읽지 마라 (아래 예외 절).
+가져온 것이다. `code-review-triad` 는 여기서 만들었지만 래퍼가 아니다. 규약이 다르니
+섞어 읽지 마라 (아래 예외 절들).
 
 `code-review-pr` 과 `code-review-final` 은 둘 다 PR 이 대상이니 description 의 호출
 문구를 겹치게 쓰지 않는다 — "PR 리뷰해줘"/"#123 리뷰" 는 `code-review-pr`,
 "머지해도 되는지 봐줘"/적대적 리뷰/코멘트 등록은 `code-review-final` 이 가져간다.
 `code-review-final` 은 `disable-model-invocation: true` 여서 모델 자동 트리거 대상이
-아니고, 겹치는 문구가 생기면 충돌이 아니라 죽은 트리거가 된다. 새 PR 리뷰 스킬을
-더할 때도 이 경계를 따른다.
+아니고, 겹치는 문구가 생기면 충돌이 아니라 죽은 트리거가 된다. `code-review-triad`
+도 같은 이유로 `disable-model-invocation: true` 이고 `/code-review-triad <n>` 로만
+뜬다 — 셋째 PR 스킬에 자연어 트리거를 주면 경계가 셋으로 쪼개져 관리가 안 된다.
+새 PR 리뷰 스킬을 더할 때도 이 경계를 따른다.
 
 ## 래퍼 셋이 공유하는 설계 — 새 래퍼도 이걸 따른다
 
@@ -85,6 +89,19 @@ description 은 "PR 리뷰해줘" 를 `code-review-pr` 과 겹치게 쓰고, fro
 
 원본이 갱신돼도 여기로 자동으로 따라오지 않는다. 다시 가져와야 한다.
 
+### code-review-triad 는 래퍼도 원본 사본도 아니다
+
+여기서 만들었고 `final` 과 모양이 닮았지만 다음이 다르다. `final` 을 고치듯 이걸 고치지
+말고, 이걸 기준으로 `final` 을 고치지도 마라.
+
+| | code-review-triad |
+|---|---|
+| 상류 도구 | 없다. Sonnet 리뷰어 3개 + Opus 판정자 1개를 직접 띄운다 |
+| 판정 | 세션이 아니라 Opus 서브에이전트가 한다 — 세션 모델과 무관하게 판정 품질을 고정하려고 |
+| 코드 확보 | 사용자 트리를 건드리지 않는다. `pull/<n>/head` 를 임시 worktree 에 풀고 끝나면 지운다 |
+| 프로젝트 규칙 | worktree 의 `CLAUDE.md` 를 리뷰어가 직접 읽는다. 규칙 내용을 복사하지 않는 원칙은 같다 |
+| 산출물 | 머지 블로커 표. PR 코멘트는 **사용자 승인 후에만** 등록한다 |
+
 ## grilling 은 리뷰 스킬이 아니고, 아래 형식도 따르지 않는다
 
 `mattpocock/skills` 의 `skills/productivity/grilling/SKILL.md` 를 커밋 `170ad48`
@@ -99,8 +116,8 @@ description 은 "PR 리뷰해줘" 를 `code-review-pr` 과 겹치게 쓰고, fro
 
 ## SKILL.md 형식
 
-- frontmatter 는 `name`, `description` 둘뿐이다. 유일한 예외는 `code-review-final` 의
-  `disable-model-invocation: true` — 아래 "code-review-final 은 이 규약을 따르지 않는다" 절 참조.
+- frontmatter 는 `name`, `description` 둘뿐이다. 예외는 `code-review-final` 과
+  `code-review-triad` 의 `disable-model-invocation: true` — 위 PR 스킬 경계 문단 참조.
 - `description` 이 유일한 트리거 수단이다. 무엇을 하는지 + 실제 호출 문구
   ("PR 리뷰해줘", "커밋 전에 리뷰") + 언제 쓰면 안 되는지를 넣는다. 스킬은
   과소 트리거되는 쪽으로 치우치므로 다소 밀어붙이는 문장이 맞다.

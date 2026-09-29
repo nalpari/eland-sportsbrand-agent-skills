@@ -1,6 +1,6 @@
 # eland-sportsbrand-agent-skills
 
-변경이 어느 단계에 있느냐에 따라 갈라지는 **Claude Code 코드리뷰 스킬 4종**과,
+변경이 어느 단계에 있느냐에 따라 갈라지는 **Claude Code 코드리뷰 스킬 5종**과,
 계획을 끈질기게 캐묻는 인터뷰 스킬 `grilling`.
 마크다운뿐이고 빌드할 것이 없다.
 
@@ -16,8 +16,8 @@ Claude Code 에는 이미 여러 리뷰 도구가 있다. 문제는 두 가지�
    아무도 안 잡는다.
 
 앞의 세 스킬은 리뷰를 새로 만들지 않는다. 기존 도구를 부르고 저 두 가지만 보탠다.
-네 번째 `code-review-final` 만 다르다 — 머지 직전 관문이라 자체 서브에이전트로
-적대적 리뷰를 돌리고 결과를 PR 코멘트로 남긴다.
+`code-review-triad` 와 `code-review-final` 은 다르다 — 상류 도구 없이 자체
+서브에이전트로 리뷰를 돌리고, 머지 블로커만 PR 코멘트로 남긴다.
 
 ## 설치
 
@@ -39,13 +39,14 @@ cp -R code-review-before-commit ~/.claude/skills/
 | 아직 커밋 안 함 | `code-review-before-commit` | "커밋 전에 리뷰해줘" |
 | 기능 하나 완성, 커밋됨 | `code-review-add-feature` | "기능 구현 완료했어 리뷰해줘" |
 | PR 올라감 | `code-review-pr` | "#123 리뷰해줘" |
+| PR 올라감, 성능·보안 블로커 확인 | `code-review-triad` | `/code-review-triad 123` |
 | 머지 직전 | `code-review-final` | "머지해도 되는지 봐줘" |
 
 > `code-review-pr` 과 `code-review-final` 은 둘 다 PR 이 대상이니 호출 문구를 갈라
 > 놓았다 — "PR 리뷰해줘"/"#123 리뷰" 는 `code-review-pr`, "머지해도 되는지 봐줘"/
 > 적대적 리뷰/코멘트 등록은 `code-review-final`. `code-review-final` 에는
 > `disable-model-invocation: true` 가 있어 모델이 자동으로 띄우지 않고,
-> `/code-review-final` 로 직접 건다. 새 PR 리뷰 스킬을 더할 때도 이 경계를 지킨다.
+> `/code-review-final` 로 직접 건다. `code-review-triad` 도 마찬가지로 슬래시로만 뜬다. 새 PR 리뷰 스킬을 더할 때도 이 경계를 지킨다.
 
 ### code-review-before-commit
 
@@ -65,6 +66,16 @@ cp -R code-review-before-commit ~/.claude/skills/
 빌트인 `code-review` 를 PR 번호로 부르고, 결과에 저장소 규칙 축별 판정을 붙여
 표로 낸다. 팀원 전원이 같은 기준으로 PR 을 보게 하는 것이 목적이다.
 `ultra` 는 부르지 않고, `--comment`/`--fix` 는 요청받았을 때만 붙인다.
+
+### code-review-triad
+
+PR 번호만 받는다. PR head 를 **임시 worktree** 에 풀어 사용자 워킹 트리와 브랜치는
+건드리지 않는다. Sonnet 서브에이전트 3개가 퍼포먼스 / 문법·정확성 / 시큐리티
+관점으로 동시에 리뷰하고 — 각 관점은 장애급 문제만 찾도록 좁혀 있다 — Opus
+서브에이전트 하나가 인용된 줄을 직접 확인하며 **머지 블로커만** 골라 해결 방안을
+붙인다. 대상 저장소 `CLAUDE.md` 가 있으면 리뷰어가 읽고 관점에 해당하는 규칙
+위반도 본다. 표를 보여주고 **사용자가 승인하면** PR 코멘트로 등록한 뒤 worktree 를
+지운다.
 
 ### code-review-final
 
@@ -97,6 +108,7 @@ PR 번호와 브랜치를 받아 **체크아웃한 뒤**, Opus 서브에이전�
 | `code-review-before-commit` | `pr-review-toolkit` 플러그인 |
 | `code-review-add-feature` | `superpowers` 플러그인 |
 | `code-review-pr` | 빌트인 `code-review`, `gh` CLI |
+| `code-review-triad` | `gh` CLI, Sonnet·Opus 서브에이전트를 띄울 수 있는 세션 |
 | `code-review-final` | `gh` CLI, Opus 서브에이전트를 띄울 수 있는 세션 |
 | `grilling` | 없음 |
 
@@ -106,6 +118,9 @@ PR 번호와 브랜치를 받아 **체크아웃한 뒤**, Opus 서브에이전�
 `code-review-final` 은 예외다. **브랜치를 체크아웃하고** (워킹 트리가 더러우면 멈추고
 알린다) **PR 코멘트를 등록한다.** 코멘트는 팀 전체에 보인다. 리뷰만 보고 싶으면
 `code-review-pr` 을 써라.
+
+`code-review-triad` 도 PR 코멘트를 등록하지만, 표를 먼저 보여주고 **승인을 받은 뒤에만**
+등록한다. 체크아웃하지 않으니 워킹 트리가 더러워도 돌릴 수 있다.
 
 ## 다른 저장소에 옮길 때
 
@@ -117,7 +132,8 @@ PR 번호와 브랜치를 받아 **체크아웃한 뒤**, Opus 서브에이전�
 대상 저장소에 `CLAUDE.md` 가 없으면 규칙 축은 그냥 건너뛰고, 남는 것은 범위 교정과
 표 정리다. 그것만으로도 쓸모는 있지만 이 스킬들의 절반이다.
 
-`code-review-final` 은 규칙 축이 없어서 이 작업이 필요 없다. 어느 저장소에 놓든
+`code-review-final` 은 규칙 축이 없고, `code-review-triad` 는 절 이름 대신 `CLAUDE.md`
+파일 자체를 읽게 해서 둘 다 이 작업이 필요 없다. 어느 저장소에 놓든
 그대로 동작한다.
 
 ## 기여
