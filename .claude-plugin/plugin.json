@@ -1,0 +1,12 @@
+{
+  "name": "3top-review",
+  "description": "변경 단계별 코드리뷰 스킬 모음 — 커밋 전, 기능 단위, PR, 머지 직전",
+  "author": { "name": "nalpari" },
+  "skills": [
+    "./code-review-before-commit/",
+    "./code-review-add-feature/",
+    "./code-review-pr/",
+    "./code-review-triad/",
+    "./code-review-final/"
+  ]
+}

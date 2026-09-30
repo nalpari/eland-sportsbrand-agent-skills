@@ -12,11 +12,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 | 배포 위치 | 용도 |
 |---|---|
+| 플러그인 `3top-review` (이 저장소가 곧 마켓플레이스) | 기본. 푸시하면 자동 업데이트를 켠 사용자에게 반영된다 |
 | `<대상 저장소>/.claude/skills/<name>/` | 팀 공유. 그 저장소에 커밋된다 |
 | `~/.claude/skills/<name>/` | 개인용. 공유되지 않는다 |
 
 `code-review-pr` 의 사본이 `~/dev/devgrr/eland/brand/.claude/skills/` 에 있고
-아직 커밋되지 않았다. 여기를 고치면 그쪽도 같이 봐야 한다.
+아직 커밋되지 않았다. 여기를 고치면 그쪽도 같이 봐야 한다. 그 저장소에서 플러그인을
+켜면 사본과 플러그인 스킬이 둘 다 떠서 트리거가 겹치니 사본을 지운다.
+
+### 플러그인
+
+`.claude-plugin/plugin.json` 의 `skills` 배열에 적힌 디렉터리만 플러그인에 실린다.
+**새 스킬을 만들면 이 배열에 추가해야 한다** — 빠뜨리면 에러 없이 배포에서 빠진다.
+`grilling` 과 `hoka-cnp` 는 일부러 뺐다. `hoka-cnp` 는 brand 저장소 전용 커밋 스킬이라
+전역에 깔리면 "커밋해줘" 를 다른 커밋 스킬과 다툰다.
+
+`version` 필드는 일부러 없다. 없으면 커밋 SHA 가 버전이 되어 푸시마다 업데이트로
+잡힌다. 넣으면 그 값을 올리기 전까지 아무에게도 반영되지 않는다.
+
+플러그인으로 깔면 슬래시 명령에 접두사가 붙는다 — `/3top-review:code-review-triad`.
+본문의 `/code-review-triad` 같은 표기는 복사 설치 기준이다.
+
+검증은 `claude plugin validate .`. `version` 누락 경고는 위 이유로 정상이다.
 
 ## 다섯 스킬은 리뷰 사다리다
 

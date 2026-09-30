@@ -1,0 +1,7 @@
+{
+  "name": "3top-review",
+  "owner": { "name": "nalpari" },
+  "plugins": [
+    { "name": "3top-review", "source": "./" }
+  ]
+}

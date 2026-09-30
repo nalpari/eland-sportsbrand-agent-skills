@@ -21,7 +21,37 @@ Claude Code 에는 이미 여러 리뷰 도구가 있다. 문제는 두 가지�
 
 ## 설치
 
-디렉터리째 복사하면 끝이다.
+### 플러그인 (권장)
+
+이 저장소 자체가 마켓플레이스이자 플러그인 `3top-review` 다.
+
+```
+/plugin marketplace add nalpari/eland-sportsbrand-agent-skills
+/plugin install 3top-review@3top-review
+```
+
+**자동 업데이트는 사용자가 켜야 한다.** 서드파티 마켓플레이스는 기본값이 꺼짐이고,
+마켓플레이스 쪽에서 강제할 수 없다. `/plugin` → Marketplaces → `3top-review` 에서
+자동 업데이트를 켠다. 팀 저장소에 한 번에 걸고 싶으면 그 저장소
+`.claude/settings.json` 에 넣는다.
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "3top-review": {
+      "source": { "source": "github", "repo": "nalpari/eland-sportsbrand-agent-skills" },
+      "autoUpdate": true
+    }
+  }
+}
+```
+
+플러그인 스킬은 이름에 접두사가 붙는다 — `/3top-review:code-review-triad 123`.
+`grilling` 은 플러그인에 들어 있지 않다. 필요하면 아래처럼 복사한다.
+
+### 복사
+
+디렉터리째 복사해도 된다.
 
 ```bash
 # 팀 공유 — 대상 저장소에 커밋된다
