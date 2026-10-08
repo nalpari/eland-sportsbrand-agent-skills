@@ -27,12 +27,27 @@ disable-model-invocation: true
 
 ### 1. PR 메타 확인
 
+이 저장소의 원격은 AWS CodeCommit(`codecommit://`)이다. `gh` 는 쓰지 않는다 — PR 은 `aws codecommit` 으로 다룬다.
+
+먼저 저장소 좌표를 리모트 URL 에서 읽는다. URL 형식은 `codecommit://[<profile>@]<repo>` 또는 `codecommit::<region>://[<profile>@]<repo>` 다.
+
 ```bash
-gh pr view <n> --json number,title,url,state,baseRefName,headRefName,headRefOid
+git remote get-url origin
 ```
 
-- `state` 가 `OPEN` 이 아니면 멈추고 알린다. 닫히거나 머지된 PR 에 블로커 코멘트는 의미가 없다.
-- `baseRefName` 이 base, `headRefOid` 가 리뷰 대상 커밋이다.
+- `codecommit` 으로 시작하지 않으면 멈추고 알린다. 이 스킬은 CodeCommit 전용이다.
+- `<repo>` 는 마지막 `/` 뒤, `@` 가 있으면 그 뒤. `<profile>` 은 `@` 앞, `<region>` 은 `codecommit::` 과 `://` 사이. 없는 값은 비워 둔다.
+- 아래 `aws` 명령에는 값이 있는 것만 `--profile <profile> --region <region>` 으로 붙인다. 셸 변수는 호출 사이에 남지 않으니 값을 명령에 직접 적는다. git 이 쓰는 자격 증명과 같은 프로필을 써야 같은 계정의 PR 을 본다.
+
+```bash
+aws codecommit get-pull-request --pull-request-id <n> \
+  --query 'pullRequest.{title:title,status:pullRequestStatus,repo:pullRequestTargets[0].repositoryName,src:pullRequestTargets[0].sourceReference,dst:pullRequestTargets[0].destinationReference,srcCommit:pullRequestTargets[0].sourceCommit,dstCommit:pullRequestTargets[0].destinationCommit}'
+```
+
+- **`repo` 가 `<repo>` 와 다르면 멈춘다.** CodeCommit PR ID 는 저장소별 순번이 아니라 계정·리전 전체에서 이어지는 번호라, 번호만 맞고 남의 저장소 PR 일 수 있다.
+- `src` / `dst` 는 `refs/heads/` 접두사째로 온다. 떼어낸 이름을 쓴다.
+- `status` 가 `OPEN` 이 아니면 멈추고 알린다. 닫히거나 머지된 PR 에 블로커 코멘트는 의미가 없다.
+- `dst` 가 base, `srcCommit` 이 리뷰 대상 커밋이다.
 
 ### 2. 임시 worktree 준비
 
@@ -40,17 +55,14 @@ gh pr view <n> --json number,title,url,state,baseRefName,headRefName,headRefOid
 트리가 더러워도 멈출 이유가 없다.
 
 ```bash
-git fetch origin <baseRefName>
-git fetch origin "pull/<n>/head"
+git fetch origin <dst> <src>
 WT=$(mktemp -d)/pr-<n>
-git worktree add --detach "$WT" FETCH_HEAD
-git -C "$WT" rev-parse HEAD
+git worktree add --detach "$WT" <srcCommit>
 ```
 
-- fetch 를 둘로 나누는 이유: 한 번에 두 ref 를 받으면 `FETCH_HEAD` 가 첫 번째(base)를 가리켜 base 를 리뷰하게 된다. PR head 를 반드시 마지막에 받는다.
-- `pull/<n>/head` 를 받는 이유: 포크에서 온 PR 도 같은 방법으로 받힌다. 브랜치 이름으로 받으면 포크 PR 을 놓친다.
-- `rev-parse` 결과가 `headRefOid` 와 다르면 그 사이 푸시가 있었던 것이다. 실제로 받은 SHA 를 리뷰 대상으로 삼고, 보고와 코멘트에 그 SHA 를 적는다.
-- 리뷰 범위는 `git -C "$WT" diff origin/<baseRefName>...HEAD` 다.
+- worktree 를 브랜치나 `FETCH_HEAD` 가 아니라 `srcCommit` SHA 로 푸는 이유: 메타를 본 뒤 푸시가 있어도 판정 대상이 메타와 같은 커밋으로 고정된다. 보고와 코멘트에도 이 SHA 를 적는다.
+- CodeCommit 에는 `pull/<n>/head` ref 도 포크도 없다. source 브랜치를 받으면 PR 코드가 다 온다.
+- 리뷰 범위는 `git -C "$WT" diff origin/<dst>...HEAD` 다.
 
 **worktree 는 6단계에서 반드시 지운다.** 중간에 실패하거나 사용자가 멈춰도 지운다. 남겨 두면 `git worktree list` 에 쌓이고 같은 PR 을 다시 돌릴 때 충돌한다.
 
@@ -61,10 +73,10 @@ Agent 툴로 `subagent_type: "general-purpose"`, `model: "sonnet"` 서브 에이
 공통 프롬프트:
 
 ```
-PR #<n> 이 origin/<base> 에 머지되기 전이다. <관점> 관점으로 리뷰해라.
+PR #<n> 이 origin/<dst> 에 머지되기 전이다. <관점> 관점으로 리뷰해라.
 
 코드 위치: <WT>   (PR head 가 풀린 worktree. 이 경로 안에서만 읽는다)
-대상 diff:  git -C <WT> diff origin/<base>...HEAD
+대상 diff:  git -C <WT> diff origin/<dst>...HEAD
 
 <WT>/CLAUDE.md 가 있으면 먼저 읽는다. 거기 적힌 프로젝트 규칙 중 이 관점에 해당하는
 것을 위반한 코드도 지적 대상이다. 위반이면 어느 절의 규칙인지 적는다.
@@ -103,8 +115,8 @@ PR #<n> 이 origin/<base> 에 머지되기 전이다. <관점> 관점으로 리�
 Agent 툴로 `subagent_type: "general-purpose"`, `model: "opus"` 서브 에이전트 1개를 띄운다. 3단계의 세 결과를 **원문 그대로** 넘긴다. 진행자가 요약하거나 거르면 판정자가 볼 것을 진행자가 대신 고른 셈이 된다.
 
 ```
-PR #<n> (base: origin/<base>, head: <SHA>) 에 대한 리뷰 결과 3건이다.
-코드 위치: <WT>   대상 diff: git -C <WT> diff origin/<base>...HEAD
+PR #<n> (base: origin/<dst>, head: <srcCommit>) 에 대한 리뷰 결과 3건이다.
+코드 위치: <WT>   대상 diff: git -C <WT> diff origin/<dst>...HEAD
 
 [퍼포먼스]
 <원문>
@@ -138,11 +150,15 @@ PR #<n> (base: origin/<base>, head: <SHA>) 에 대한 리뷰 결과 3건이다.
 - 사용자가 특정 항목을 빼라고 하면 빼고 등록한다.
 - 사용자가 등록하지 말라고 하면 등록하지 않고 6단계로 간다.
 
-승인되면 본문을 heredoc 으로 임시 파일에 쓰고 넘긴다. `--body` 에 여러 줄 마크다운을 인라인으로 넣으면 셸 이스케이프가 깨진다.
+승인되면 본문을 heredoc 으로 임시 파일에 쓰고 `file://` 로 넘긴다. `--content` 에 여러 줄 마크다운을 인라인으로 넣으면 셸 이스케이프가 깨진다.
 
 ```bash
-gh pr comment <n> --body-file <파일>
+aws codecommit post-comment-for-pull-request --pull-request-id <n> --repository-name <repo> \
+  --before-commit-id <dstCommit> --after-commit-id <srcCommit> --content file://<파일>
 ```
+
+- 등록 직전에 `get-pull-request` 를 다시 불러 `dstCommit` / `srcCommit` 을 새로 받는다. after 는 코멘트 시점의 source 브랜치 끝이어야 한다. 그 값이 리뷰한 SHA 와 다르면 그 사이 푸시가 있었다는 뜻이니 사용자에게 알린다 — 코멘트 본문의 SHA 는 리뷰한 SHA 그대로 둔다.
+- 본문은 10,240자 제한이다. 넘으면 등록이 실패한다.
 
 ### 6. 정리
 
