@@ -35,6 +35,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 검증은 `claude plugin validate .`. `version` 누락 경고는 위 이유로 정상이다.
 
+## PR 은 AWS CodeCommit 에 있다
+
+대상 저장소 원격은 `codecommit://` (git-remote-codecommit) 이다. PR 스킬 셋
+(`code-review-pr` / `-final` / `-triad`) 은 `gh` 대신 `aws codecommit` 으로 PR 을 읽고
+코멘트를 단다. git 명령(`fetch`, `origin/<branch>`, `merge-base`)은 그대로 동작한다.
+GitHub 기준 문법(`gh`, `pull/<n>/head`, 빌트인 `code-review` 에 PR 번호 넘기기,
+`--comment`)을 다시 들이지 마라 — 에러 없이 엉뚱한 범위를 리뷰하거나 실패한다.
+
 ## 다섯 스킬은 리뷰 사다리다
 
 같은 일을 다섯으로 나눈 게 아니라, **변경이 어느 단계에 있느냐**로 나뉜다.
@@ -106,6 +114,9 @@ description 은 "PR 리뷰해줘" 를 `code-review-pr` 과 겹치게 쓰고, fro
 
 원본이 갱신돼도 여기로 자동으로 따라오지 않는다. 다시 가져와야 한다.
 
+CodeCommit 전환(`gh` → `aws codecommit`)도 여기서 얹은 개입이다. 원본은 GitHub `gh`
+기준이라 다시 가져오면 2단계 PR 메타와 5단계 코멘트 등록이 `gh` 로 돌아간다.
+
 ### code-review-triad 는 래퍼도 원본 사본도 아니다
 
 여기서 만들었고 `final` 과 모양이 닮았지만 다음이 다르다. `final` 을 고치듯 이걸 고치지
@@ -115,7 +126,7 @@ description 은 "PR 리뷰해줘" 를 `code-review-pr` 과 겹치게 쓰고, fro
 |---|---|
 | 상류 도구 | 없다. Sonnet 리뷰어 3개 + Opus 판정자 1개를 직접 띄운다 |
 | 판정 | 세션이 아니라 Opus 서브에이전트가 한다 — 세션 모델과 무관하게 판정 품질을 고정하려고 |
-| 코드 확보 | 사용자 트리를 건드리지 않는다. `pull/<n>/head` 를 임시 worktree 에 풀고 끝나면 지운다 |
+| 코드 확보 | 사용자 트리를 건드리지 않는다. PR 의 `sourceCommit` 을 임시 worktree 에 풀고 끝나면 지운다 |
 | 프로젝트 규칙 | worktree 의 `CLAUDE.md` 를 리뷰어가 직접 읽는다. 규칙 내용을 복사하지 않는 원칙은 같다 |
 | 산출물 | 머지 블로커 표. PR 코멘트는 **사용자 승인 후에만** 등록한다 |
 
@@ -146,3 +157,8 @@ description 은 "PR 리뷰해줘" 를 `code-review-pr` 과 겹치게 쓰고, fro
 ## 커밋
 
 `<type>: <한글 subject>` — type 접두사만 영어. 스킬 하나가 커밋 하나다.
+
+## Always Do
+
+- 모든 답변과 추론과정은 한국어로 보여준다.
+- TodoTool 를 찾아보고 만약 TodoTool 을 사용할수 있다면 task를 Todo를 작성해서 진행한다.
