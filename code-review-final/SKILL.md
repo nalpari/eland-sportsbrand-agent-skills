@@ -45,12 +45,28 @@ git pull --ff-only
 
 ### 2. PR 메타 확인
 
+이 저장소의 원격은 AWS CodeCommit(`codecommit://`)이다. `gh` 는 쓰지 않는다 — PR 은 `aws codecommit` 으로 다룬다.
+
+먼저 저장소 좌표를 리모트 URL 에서 읽는다. URL 형식은 `codecommit://[<profile>@]<repo>` 또는 `codecommit::<region>://[<profile>@]<repo>` 다.
+
 ```bash
-gh pr view <n> --json number,title,url,baseRefName,headRefName,additions,deletions,changedFiles
+git remote get-url origin
 ```
 
-- `headRefName` 이 방금 체크아웃한 브랜치와 다르면 **멈추고 사용자에게 알린다.** 엉뚱한 코드를 리뷰하게 된다.
-- `baseRefName` 을 base ref 로 쓴다. 아래 프롬프트에 `origin/<baseRefName>` 형태로 박아 넣는다.
+- `codecommit` 으로 시작하지 않으면 멈추고 알린다. 이 스킬은 CodeCommit 전용이다.
+- `<repo>` 는 마지막 `/` 뒤, `@` 가 있으면 그 뒤. `<profile>` 은 `@` 앞, `<region>` 은 `codecommit::` 과 `://` 사이. 없는 값은 비워 둔다.
+- 아래 `aws` 명령에는 값이 있는 것만 `--profile <profile> --region <region>` 으로 붙인다. 셸 변수는 호출 사이에 남지 않으니 값을 명령에 직접 적는다. git 이 쓰는 자격 증명과 같은 프로필을 써야 같은 계정의 PR 을 본다.
+
+```bash
+aws codecommit get-pull-request --pull-request-id <n> \
+  --query 'pullRequest.{title:title,status:pullRequestStatus,repo:pullRequestTargets[0].repositoryName,src:pullRequestTargets[0].sourceReference,dst:pullRequestTargets[0].destinationReference,srcCommit:pullRequestTargets[0].sourceCommit,dstCommit:pullRequestTargets[0].destinationCommit}'
+```
+
+- **`repo` 가 `<repo>` 와 다르면 멈춘다.** CodeCommit PR ID 는 저장소별 순번이 아니라 계정·리전 전체에서 이어지는 번호라, 번호만 맞고 남의 저장소 PR 일 수 있다.
+- `src` / `dst` 는 `refs/heads/` 접두사째로 온다. 떼어낸 이름을 쓴다.
+- `src` 가 방금 체크아웃한 브랜치와 다르면 **멈추고 사용자에게 알린다.** 엉뚱한 코드를 리뷰하게 된다.
+- `git rev-parse HEAD` 가 `srcCommit` 과 다르면 멈추고 알린다. 로컬 브랜치가 PR 과 어긋나 있다.
+- `dst` 를 base ref 로 쓴다. 아래 프롬프트에 `origin/<dst>` 형태로 박아 넣는다.
 
 ### 3. 적대적 리뷰 서브 에이전트 3개 실행
 
@@ -59,10 +75,10 @@ Agent 툴로 `subagent_type: "general-purpose"`, `model: "opus"` 서브 에이�
 각 프롬프트에 공통으로 넣는다:
 
 ```
-브랜치 <브랜치> 가 origin/<base> 에 머지되기 직전이다. 적대적으로 리뷰해라.
+브랜치 <브랜치> 가 origin/<dst> 에 머지되기 직전이다. 적대적으로 리뷰해라.
 
 대상 diff:
-  git diff origin/<base>...HEAD
+  git diff origin/<dst>...HEAD
 
 규칙:
 - diff 에 실제로 있는 코드만 지적한다. 기억이나 추측으로 코드를 만들어내지 마라.
@@ -108,10 +124,13 @@ Agent 툴로 `subagent_type: "general-purpose"`, `model: "opus"` 서브 에이�
 먼저 표를 사용자에게 보여준다. 그다음 등록한다.
 
 ```bash
-gh pr comment <n> --body-file <파일>
+aws codecommit post-comment-for-pull-request --pull-request-id <n> --repository-name <repo> \
+  --before-commit-id <dstCommit> --after-commit-id <srcCommit> --content file://<파일>
 ```
 
-- 본문은 heredoc 으로 임시 파일에 쓰고 `--body-file` 로 넘긴다. `--body` 에 여러 줄 마크다운을 인라인으로 넣지 않는다.
+- 본문은 heredoc 으로 임시 파일에 쓰고 `file://` 로 넘긴다. `--content` 에 여러 줄 마크다운을 인라인으로 넣지 않는다.
+- `--before-commit-id` / `--after-commit-id` 는 2단계 값이다. 2단계 이후 푸시가 있었으면 `get-pull-request` 를 다시 불러 최신 값을 쓴다 — after 는 코멘트 시점의 source 브랜치 끝이어야 한다.
+- 본문은 10,240자 제한이다. 넘으면 등록이 실패한다.
 - **블로커가 0이면 그 사실을 한 줄로 코멘트한다.** 표는 생략한다.
 
 ## 코멘트 형식
