@@ -11,16 +11,40 @@ description: '이 저장소에 올라온 PR 을 빌트인 code-review 로 리뷰
 
 ## 1. 대상 PR 확정
 
+이 저장소의 원격은 AWS CodeCommit(`codecommit://`)이다. `gh` 는 쓰지 않는다 — PR 은 `aws codecommit` 으로 다룬다.
+
+먼저 저장소 좌표를 리모트 URL 에서 읽는다. URL 형식은 `codecommit://[<profile>@]<repo>` 또는 `codecommit::<region>://[<profile>@]<repo>` 다.
+
+```bash
+git remote get-url origin
+```
+
+- `codecommit` 으로 시작하지 않으면 멈추고 알린다. 이 스킬은 CodeCommit 전용이다.
+- `<repo>` 는 마지막 `/` 뒤, `@` 가 있으면 그 뒤. `<profile>` 은 `@` 앞, `<region>` 은 `codecommit::` 과 `://` 사이. 없는 값은 비워 둔다.
+- 아래 `aws` 명령에는 값이 있는 것만 `--profile <profile> --region <region>` 으로 붙인다. 셸 변수는 호출 사이에 남지 않으니 값을 명령에 직접 적는다. git 이 쓰는 자격 증명과 같은 프로필을 써야 같은 계정의 PR 을 본다.
+
 PR 번호는 필수다. **추측하지 않는다.** 못 받았으면 목록을 보여주고 묻는다.
 
 ```bash
-gh pr list --limit 20
+aws codecommit list-pull-requests --repository-name <repo> --pull-request-status OPEN
 ```
+
+ID 만 돌아온다. 제목이 필요하면 ID 마다 아래 `get-pull-request` 를 부른다.
 
 번호가 정해지면 메타를 확인한다.
 
 ```bash
-gh pr view <n> --json number,title,url,baseRefName,headRefName,additions,deletions,changedFiles
+aws codecommit get-pull-request --pull-request-id <n> \
+  --query 'pullRequest.{title:title,status:pullRequestStatus,repo:pullRequestTargets[0].repositoryName,src:pullRequestTargets[0].sourceReference,dst:pullRequestTargets[0].destinationReference}'
+```
+
+- **`repo` 가 `<repo>` 와 다르면 멈춘다.** CodeCommit PR ID 는 저장소별 순번이 아니라 계정·리전 전체에서 이어지는 번호라, 번호만 맞고 남의 저장소 PR 일 수 있다.
+- `src` / `dst` 는 `refs/heads/` 접두사째로 온다. 떼어낸 이름을 쓴다.
+- 변경 규모는 API 가 주지 않는다. git 으로 센다.
+
+```bash
+git fetch origin <dst> <src>
+git diff --shortstat origin/<dst>...origin/<src>
 ```
 
 사용자에게 한 줄로 보고한다:
@@ -34,8 +58,12 @@ gh pr view <n> --json number,title,url,baseRefName,headRefName,additions,deletio
 ## 2. 빌트인 code-review 호출
 
 ```
-Skill(skill: "code-review", args: "high 123")
+Skill(skill: "code-review", args: "high origin/feature/order-cancel")
 ```
+
+target 은 PR 번호가 아니라 **source 브랜치(`origin/<src>`)** 다. 빌트인은 PR 번호를 GitHub PR 로 해석한다. CodeCommit 번호를 넘기면 못 찾거나, target 을 검증하지 않으니 에러 없이 현재 브랜치 diff 를 리뷰한다.
+
+리뷰가 끝나면 빌트인이 본 파일이 `git diff --name-only origin/<dst>...origin/<src>` 와 맞는지 확인한다. 다르면 base 가 다르게 잡힌 것이다 — 결과를 내지 말고 사용자에게 알린다.
 
 호출할 것은 빌트인 `code-review` 다. 플러그인의 `code-review:code-review` 나 `coderabbit:code-review` 는 다른 도구이고 인자 규약도 다르다.
 
@@ -43,9 +71,10 @@ Skill(skill: "code-review", args: "high 123")
 
 - **순서는 `<effort> <target>` 고정.** 첫 토큰이 effort 로 소비된다. `"123 high"` 는 123 을 effort 로 먹는다.
 - **effort 기본은 `high`.** 사용자가 가볍게 보자고 하면 `low`/`medium`, 더 넓게 보자고 하면 `max`.
-- **target 은 PR 번호 / 브랜치명 / 파일 경로 셋 중 하나만.** `/code-review` 는 target 을 검증하지 않는다. 문장이나 설명("주문 API PR 좀 봐줘")을 넘기면 **에러 없이** 기본 범위인 현재 브랜치 diff 를 리뷰한다. 결과는 그럴듯하게 나오고 아무도 눈치채지 못한다. 넘기기 전에 target 이 번호 하나인지 눈으로 확인한다.
+- **target 은 브랜치명 하나만.** `/code-review` 는 target 을 검증하지 않는다. 문장이나 설명("주문 API PR 좀 봐줘")을 넘기면 **에러 없이** 기본 범위인 현재 브랜치 diff 를 리뷰한다. 결과는 그럴듯하게 나오고 아무도 눈치채지 못한다. 넘기기 전에 target 이 `origin/<src>` 하나인지 눈으로 확인한다.
 - **`ultra` 를 부르지 마라.** 사용자만 트리거할 수 있고 별도 과금된다. 필요해 보이면 `/code-review ultra <n>` 을 직접 치라고 안내한다.
-- **`--comment` / `--fix` 는 사용자가 명시적으로 요청했을 때만.** `--comment` 는 PR 에 인라인 코멘트를 등록한다 — 팀 전체에 보이는 외부 행위다. `--fix` 는 워킹 트리를 고친다. 기본은 터미널 출력뿐이다.
+- **`--comment` 를 쓰지 마라.** GitHub PR 에 인라인 코멘트를 다는 플래그라 CodeCommit 에서는 동작하지 않는다. PR 코멘트 등록은 `code-review-final` 의 일이다.
+- **`--fix` 는 사용자가 명시적으로 요청했을 때만.** 워킹 트리를 고친다. 기본은 터미널 출력뿐이다.
 
 ## 3. 프로젝트 규칙 축 얹기 — 이 래퍼의 존재 이유
 
@@ -99,6 +128,7 @@ Skill(skill: "code-review", args: "high 123")
 - PR 번호 추측하기. "최근 거겠지" 로 남의 PR 을 리뷰하게 된다.
 - args 에 문장 넘기기. 조용히 현재 브랜치를 리뷰하고 결과는 멀쩡해 보인다.
 - `ultra` 부르기. 사용자 트리거 전용이고 과금된다.
-- 시키지 않은 `--comment`. PR 코멘트는 팀 전체에 보이고 지워도 알림은 이미 갔다.
+- `--comment` 쓰기. GitHub 전용이고, PR 코멘트는 팀 전체에 보이고 지워도 알림은 이미 갔다.
+- args 에 CodeCommit PR 번호 넘기기. 빌트인은 GitHub PR 로 해석한다.
 - 시키지 않은 `--fix`. 리뷰 결과를 보는 것과 반영하는 것은 별개의 결정이다.
 - CLAUDE.md 규칙을 이 파일로 옮겨 적기. 두 벌이 되는 순간 한 벌은 틀린다.
